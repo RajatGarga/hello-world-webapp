@@ -1,0 +1,35 @@
+pipeline {
+    agent any
+    environment {
+        registry = "gargarajat/hello-world-webappy"
+        registryCredential = 'dockerhub'
+        dockerImage = ''
+        }
+    stages {
+        stage('Initialize'){
+            def dockerHome = tool 'myDocker'
+            env.PATH = "${dockerHome}/bin:${env.PATH}"
+        }
+        stage('Build') {
+            steps {
+                // Get some code from a GitHub repository
+                script {
+                    git 'https://github.com/RajatGarga/hello-world-webapp.git'
+                    dockerImage = docker.build registry + ":latest"
+                    docker.withRegistry( '', registryCredential ) {
+                        dockerImage.push()
+                    }
+                }
+            }
+
+            post {
+                // If Maven was able to run the tests, even if some of the test
+                // failed, record the test results and archive the jar file.
+                success {
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                    archiveArtifacts 'target/*.jar'
+                }
+            }
+        }
+    }
+}
