@@ -7,12 +7,15 @@ pipeline {
         }
     stages {
         stage('Initialize'){
-            def dockerHome = tool 'myDocker'
-            env.PATH = "${dockerHome}/bin:${env.PATH}"
+            steps {
+                script {
+                    def dockerHome = tool 'myDocker'
+                    env.PATH = "${dockerHome}/bin:${env.PATH}"
+                }
+            }
         }
         stage('Build') {
             steps {
-                // Get some code from a GitHub repository
                 script {
                     git 'https://github.com/RajatGarga/hello-world-webapp.git'
                     dockerImage = docker.build registry + ":latest"
@@ -23,11 +26,19 @@ pipeline {
             }
 
             post {
-                // If Maven was able to run the tests, even if some of the test
-                // failed, record the test results and archive the jar file.
-                success {
-                    junit '**/target/surefire-reports/TEST-*.xml'
-                    archiveArtifacts 'target/*.jar'
+                always {
+                    sh '''
+                    format="\n*->* %s *(%cr) <%cn>*";
+                    commit_messages="$(git log -1 --format="$format")";
+
+                    message="****************BUILD $1****************";
+                    message="${message}\n*JOB_NAME* : ${JOB_NAME} [${BUILD_DISPLAY_NAME}]";
+                    message="${message}\n*COMMIT_MESSAGES* : $commit_messages";
+                    message="${message}\n***********************************************";
+                    echo ${message};
+                    
+                    curl -X POST https://api.flock.com/hooks/sendMessage/8d95a304-ac8f-4aff-902a-8e810b0b9bcf -H "Content-Type: application/json" -d "{ 'notification' : '$(getNotification started)', 'text' : '${message}' }";
+                    '''
                 }
             }
         }
